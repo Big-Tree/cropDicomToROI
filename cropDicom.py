@@ -22,7 +22,7 @@ def save_contrilateral_images():
 
 # Get list of files that are for presentation and have ROIs
 # Copy these files to a new folder
-def get_ROIs(dstCopy, lesion_path, spreadsheet):
+def get_ROIs(dstCopy, lesion_path, spreadsheet, batch = 1):
     import pandas as pd
     from shutil import copyfile
     xls = pd.ExcelFile(spreadsheet)
@@ -39,17 +39,16 @@ def get_ROIs(dstCopy, lesion_path, spreadsheet):
 
     for index, path in enumerate(file_list):
         copyfile(path, dstCopy + '/' + os.path.basename(file_list[index]))
-        print(index, '\\', len(file_list) )
+        print(index, '\\', len(file_list), 'batch ', batch )
 
 
 # This will copy images to a separate folder that have both ROIs, are for
 # presentation and ensures that only one image from each StudyIUID is copied
 def select_and_copy_dicom_images():
     batch_numbers = [1, 3, 5, 6, 7]
-    batch_numbers = [3, 5, 6, 7]
+    batch_numbers = [1]
     #batch_numbers = [1]
     for batch in batch_numbers:
-        print('batch: ', batch)
         dicom_files = (
             '/vol/research/mammo2/will/data/batches/IMAGE_DATABASE/PUBLIC_SHARE/IMAGES/STANDARD_SET/'
             + str(batch) + '/')
@@ -108,8 +107,8 @@ def main():
     '/vol/research/mammo2/will/data/batches/roi/batch_1/lesions_for_presentation_one_per_studyIUID/')
     patch_write_location = '/vol/research/mammo2/will/data/batches/roi/'
 
-    #create_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
-    select_and_copy_dicom_images()
+    create_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
+    #select_and_copy_dicom_images()
 
 if __name__ == "__main__":
     main()
