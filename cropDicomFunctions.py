@@ -38,7 +38,7 @@ def getFiles(dicom_files, verbose=1):
         dicomImg = np.append(dicomImg, pydicom.dcmread(f))
         count += 1
         print(count, '/', len(fileList))
-    print('name:\n', dicomImg[0].PresentationIntentType)
+    #print('name:\n', dicomImg[0].PresentationIntentType)
     return dicomImg, fileList
 
 
@@ -118,12 +118,13 @@ def getContralateral(imageSOPIUD, sheet):
 
 # Remove images from fList so that there is only one per patient
 # Pass sheet that has 'studyIUID'
-def get_file_list_ROI_single(file_list, sheet):
+def filter_for_single_StudyIUID(file_list, sheet):
     # Run through file_list
     # Images should be ordered in terms of patient
     # Hold the current patient in tmp_patient
     # If any susequent imgages have the same tmp_patient delete them
     # Else update the tmp_patient
+    print('filter for single StudyIUID...')
     tmp_studyIUID = ''
     new_file_list = []
     for f in file_list:
@@ -131,39 +132,56 @@ def get_file_list_ROI_single(file_list, sheet):
         # Find the row in the xml file that holds the img info
         try:
             indx = [_ == key for _ in sheet['ImageSOPIUID']].index(True)
+            if tmp_studyIUID != getSpreadsheetCell('StudyIUID', key, sheet):
+                # New studyIUID - append
+                new_file_list.append(f)
+            tmp_studyIUID = getSpreadsheetCell('StudyIUID', key, sheet)
         except ValueError:
             print(key, ' not found\n')
-        if tmp_studyIUID == getSpreadsheetCell('StudyIUID', key, sheet):
-            # Image studyIUID repeated - ignore
-            ignore = 1234 # just a placeholder
-        else:
-            # New studyIUID - append
-            new_file_list.append(f)
-        tmp_studyIUID = getSpreadsheetCell('StudyIUID', key, sheet)
-    print('get_file_list_ROI_single - list reduced from: ', len(file_list),
+    print('List reduced from: ', len(file_list),
           'to: ',  len(new_file_list))
     return new_file_list
 
+# Remove files that are not FOR PRESENTATION
+def filter_for_presentation(file_list, sheet, verbose = True):
+    if verbose == True:
+        print('Filter for presentation...')
+    new_list = []
+    for f in file_list:
+        key = os.path.basename(f)[:-4]
+        # Get index
+        try:
+            indx = [_==key for _ in sheet['ImageSOPIUID']].index(True)
+            # Check presentation type
+            if (getSpreadsheetCell('PresentationIntentType', key, sheet) == 
+                    'FOR PRESENTATION'):
+                # Add to newlist
+                new_list.append(f)
+        except ValueError:
+            if verbose == True:
+                print('MY_ERROR: key not fonud:\n', key)
+    if verbose == True:
+        print(len(file_list), ' reduced to ', len(new_list))
+    return new_list
+
 
 # Remove files that are not in the spreadsheet
-def getFileListROI(fList, sheet, sheetPresentation, verbose = False):
+def filter_spreadsheet(fList, sheet, verbose = False):
+    print('Removing files that are not in the spreadsheet...')
     img = {}
-    filesListROI = []
-    for i in range(len(fList)):
-        key = os.path.basename(fList[i])[:-4]
+    new_list = []
+    for f in fList:
+        key = os.path.basename(f)[:-4]
         # Find row in the xml file that holds the img info
         try:
             indx = [_==key for _ in sheet['ImageSOPIUID']].index(True) # ImageSOPIUID, ReferencedSOPInstanceUID
-            # check that the image is for presentation
-            if getSpreadsheetCell('PresentationIntentType', key, sheetPresentation) == 'FOR PRESENTATION':
-                filesListROI.append(fList[i])
-            else:
-                if verbose == True:
-                    print(    'Key rejected - for processing:\n', key)
+            # No error therefore image must be in spreadsheet
+            new_list.append(f)
         except ValueError:
             if verbose == True:
                 print('MY_ERROR: key not found:\n', key)
-    return filesListROI
+    print(len(fList), ' reduced to ', len(new_list))
+    return new_list
 # Given a sheet and ImageSOPIUID, returns value at column x
 
 def getSpreadsheetCell(column, ImageSOPIUID, sheet):
@@ -172,11 +190,11 @@ def getSpreadsheetCell(column, ImageSOPIUID, sheet):
     return sheet[column][indx]
 
 # Import xls file, extract ROI coords, get pixel array from DICOM image
-def buildDict(dicomImg, fileList):
+def buildDict(dicomImg, fileList, spreadsheet, verbose = True):
     #xls = pd.ExcelFile('/vol/vssp/cvpwrkspc01/scratch/wm0015/download/batch_1_IMAGE.xls')
     #xls = pd.ExcelFile('/vol/vssp/cvpwrkspc01/scratch/wm0015/batch_50_IMAGE.xls')
-    xls = pd.ExcelFile(SPREADSHEET)
-    sheet = xls.parse(0)
+    xls = pd.ExcelFile(spreadsheet)
+    sheet = xls.parse(1)
 
     # Create a dict where the key is the image name
     # Each key has the image, and coords
@@ -191,7 +209,8 @@ def buildDict(dicomImg, fileList):
             img[key].update({'x': [sheet['X1'][indx], sheet['X2'][indx]]})
             img[key].update({'y': [sheet['Y1'][indx], sheet['Y2'][indx]]})
         except ValueError:
-            print('MY_ERROR: key not found:\n', key)
+            if verbose == True:
+                print('MY_ERROR: key not found:\n', key)
 
     print(len(img), 'DICOM images extracted')
     # print(img)
@@ -235,7 +254,7 @@ def writeMarkedImages(img):
         plt.close()
 
 # Crop the images so that the ROI is centred but all crops are the same size
-def computeCrops(img):
+def computeCrops(img, crop_size = 256):
     for key in img:
         tmp = img[key]['img']
         x = img[key]['x']
@@ -244,7 +263,9 @@ def computeCrops(img):
         # Pad images before cropping (wrap around)
         pad = 1000
         tmp = np.pad(tmp, pad, mode='wrap')
-        img[key].update({'crop': tmp[int(c[1]-CROP_SIZE/2+pad):int(c[1]+CROP_SIZE/2+pad), int(c[0]-CROP_SIZE/2+pad):int(c[0]+CROP_SIZE/2+pad)]})
+        img[key].update({'crop':
+                         tmp[int(c[1]-crop_size/2+pad):int(c[1]+crop_size/2+pad),
+                             int(c[0]-crop_size/2+pad):int(c[0]+crop_size/2+pad)]})
         # Reshape from (256, 256) to (256, 256, 1)
         img[key]['crop'] = np.reshape(img[key]['crop'],(img[key]['crop'].shape[0], img[key]['crop'].shape[1], 1))
     return img
@@ -273,12 +294,13 @@ def findAverageROISize(img):
     print('Average ROI width: ', totalX/len(img), '\nAverage ROI length: ', totalY/len(img))
 
 # View crops / save to disk
-def writeCropsToDisk(img):
+def writeCropsToDisk(img, folder_location, crop_size):
     count = 0
     for key in img:
         count+=1
-        f = open('/vol/vssp/cvpwrkspc01/scratch/wm0015/batch1_crop/' + key + '.png', 'wb')
-        w = png.Writer(width = CROP_SIZE, height = CROP_SIZE, bitdepth=16, greyscale=True)
+        #f = open('/vol/vssp/cvpwrkspc01/scratch/wm0015/batch1_crop/' + key + '.png', 'wb')
+        f = open(folder_location + key + '.png', 'wb')
+        w = png.Writer(width = crop_size, height = crop_size, bitdepth=16, greyscale=True)
         w.write(f, img[key]['crop'])
         f.close()
         print(count, '/', len(img))
@@ -292,10 +314,10 @@ def buildArrayForPickle(img):    #img.update({key:{}})
         allCrops[key] = img[key]['crop']
     return allCrops
 
-def savePickle(ob):
+def savePickle(ob, dest):
     import pickle
     print('Pickling...')
-    with open('/vol/vssp/cvpwrkspc01/scratch/wm0015/batch1_normalCrop400.pickle', 'wb') as output:
+    with open(dest, 'wb') as output:
         pickle.dump(ob, output, pickle.HIGHEST_PROTOCOL)
 
 def buildDictNormals(dicomImg, fileList):
