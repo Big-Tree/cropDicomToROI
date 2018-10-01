@@ -4,7 +4,18 @@ from cropDicomFunctions import *
 # Using the spreadsheet find the contrilateral images
 # Copy these images to a folder
 
+
+def multiprocess_cont_match(tmp_properties, properties_to_match, sheet0, tmp_ImageSOPIUID):
+    for _ in tmp_properties:
+        tmp_properties[_] = getSpreadsheetCell(_, tmp_ImageSOPIUID,
+                                               sheet0)
+    if tmp_properties == properties_to_match:
+        return(tmp_ImageSOPIUID)
+
+
 def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsheet, batch = 1):
+    from functools import partial
+    import multiprocessing as mp
     import pandas as pd
     from shutil import copyfile
     import pydicom
@@ -17,6 +28,7 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
     print('Finding the contrilateral images...')
     cont_image_paths_to_copy = []
     lesion_names_with_cont = []
+    pool = mp.Pool()
     for f_index, f in enumerate(file_list_lesion):
         focus_ImageSOPIUID = os.path.basename(f)[:-4]
         # Get lesions properties
@@ -36,12 +48,25 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
         # Search spreadsheet for contrilateral images
         tmp_properties = dict(properties)
         matches = {'ImageSOPIUID':[], 'path':[]}
-        for tmp_ImageSOPIUID in sheet0['ImageSOPIUID']:
-            for _ in tmp_properties:
-                tmp_properties[_] = getSpreadsheetCell(_, tmp_ImageSOPIUID,
-                                                       sheet0)
-            if tmp_properties == properties_to_match:
-                matches['ImageSOPIUID'].append(tmp_ImageSOPIUID)
+
+        func = partial(multiprocess_cont_match, tmp_properties, properties_to_match, sheet0)
+        results = pool.map(func, sheet0['ImageSOPIUID'])
+        results = np.asarray(results)
+        matches_multi = dict(matches)
+        matches['ImageSOPIUID'] = results[results!=None]
+
+
+        #for tmp_ImageSOPIUID in sheet0['ImageSOPIUID']:
+        #    for _ in tmp_properties:
+        #        tmp_properties[_] = getSpreadsheetCell(_, tmp_ImageSOPIUID,
+        #                                               sheet0)
+        #    if tmp_properties == properties_to_match:
+        #        matches['ImageSOPIUID'].append(tmp_ImageSOPIUID)
+        #if matches == matches_multi:
+        #    print('M A T C H')
+        #else:
+        #    print('Nooooooooooooooooooooooooooooooo')
+        #    print(matches_multi, '\n', matches)
         # Get file path of the matches
         for match_ImageSOPIUID in matches['ImageSOPIUID']:
             search = fnmatch.filter(
@@ -59,17 +84,12 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
     # Copy the contilateral images to a folder
     with open(dst_copy_cont + '/lesion_to_cont_details.txt', 'w') as text_file:
         text_file.write('Format:\nLesion --- Contralateral')
-        for cont_path, lesion_name in zip(
-                cont_image_paths_to_copy, lesion_names_with_cont):
+        for count, (cont_path, lesion_name) in enumerate(zip(
+                cont_image_paths_to_copy, lesion_names_with_cont)):
             copyfile(cont_path, dst_copy_cont + '/' + lesion_name)
             text_file.write('\n' + lesion_name[0:-4] + ' --- ' +
-                            os.path.basename(cont_pathcont_path)[0:-4])
-            #print(os.path.basename(
-            #    cont_image_paths_to_copy[index]), 
-            #    '\nis cont to:\n',
-            #    os.path.basename(file_list_lesion[index]),
-            #    '\n')
-            print(index + 1, '/', len(cont_image_paths_to_copy), 'batch ', batch )
+                            os.path.basename(cont_path)[0:-4])
+            print(count + 1, '/', len(cont_image_paths_to_copy), 'batch ', batch )
 
 
 
