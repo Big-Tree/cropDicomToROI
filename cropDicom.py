@@ -9,12 +9,14 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
     from shutil import copyfile
     import pydicom
     import fnmatch
+    import os
     xls = pd.ExcelFile(spreadsheet)
     sheet1 = xls.parse(1)
     sheet0 = xls.parse(0)
 
     print('Finding the contrilateral images...')
     cont_image_paths_to_copy = []
+    lesion_names_with_cont = []
     for f_index, f in enumerate(file_list_lesion):
         focus_ImageSOPIUID = os.path.basename(f)[:-4]
         # Get lesions properties
@@ -52,43 +54,87 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
             # Sometimes there are no contrilateral images, sometimes there is
             # more than 1
             cont_image_paths_to_copy.append(matches['path'][0])
+            lesion_names_with_cont.append(os.path.basename(f))
 
     # Copy the contilateral images to a folder
-    print('Copying the contrilateral patches...')
-    for index, path in enumerate(cont_image_paths_to_copy):
-        copyfile(path, dst_copy_cont + '/' +
-                 os.path.basename(cont_image_paths_to_copy[index]))
-        #print(os.path.basename(
-        #    cont_image_paths_to_copy[index]), 
-        #    '\nis cont to:\n',
-        #    os.path.basename(file_list_lesion[index]),
-        #    '\n')
-        print(index + 1, '/', len(cont_image_paths_to_copy), 'batch ', batch )
+    with open(dst_copy_cont + '/lesion_to_cont_details.txt', 'w') as text_file:
+        text_file.write('Format:\nLesion --- Contralateral')
+        for cont_path, lesion_name in zip(
+                cont_image_paths_to_copy, lesion_names_with_cont):
+            copyfile(cont_path, dst_copy_cont + '/' + lesion_name)
+            text_file.write('\n' + lesion_name[0:-4] + ' --- ' +
+                            os.path.basename(cont_pathcont_path)[0:-4])
+            #print(os.path.basename(
+            #    cont_image_paths_to_copy[index]), 
+            #    '\nis cont to:\n',
+            #    os.path.basename(file_list_lesion[index]),
+            #    '\n')
+            print(index + 1, '/', len(cont_image_paths_to_copy), 'batch ', batch )
 
 
 
-def contrilateral_patches():
-    for f in file_list_lesion:
-        studyIUID = os.path.basename(f)[:-4]
-        indx = [_ == key for _ in sheet['ImageSOPIUID']].index(True)
+def contrilateral_patches(crop_size, write_location, spreadsheet):
+    import pandas as pd
+    print('Creating contilateral patches, size: ', crop_size, '...')
+    xls = pd.ExcelFile(spreadsheet)
+    sheet0 = xls.parse(0)
+    sheet1 = xls.parse(1)
+    batch_numbers = [1, 3, 5, 6, 7]
+    image_dict = {}
+    for batch in batch_numbers:
+        # Load in the images and filenames
+        file_list_lesion = getFileNames(
+            '/vol/research/mammo2/will/data/batches/roi/batch_' +
+            str(batch) + '/lesions_for_presentation_one_per_studyIUID/')
+        file_list_cont = getFileNames(
+            '/vol/research/mammo2/will/data/batches/roi/batch_' +
+            str(batch) + '/cont_for_presentation_one_per_studyIUID/')
+        spreadsheet = ('/vol/research/mammo2/will/data/batches/metadata/' +
+            str(batch) + '/batch_' + str(batch) + '_IMAGE.xls')
+        print('file_list_lesion:\n', file_list_lesion)
+        print('file_list_cont:\n', file_list_cont)
+        print('spreadsheet:\n', spreadsheet)
+    crops = {}
+    for f_lesion, f_cont in zip(file_list_lesion, file_list_cont):
+        ImageSOPIUID = os.path.basename(f_lesion)[:-4]
+        indx = [_ == ImageSOPIUID for _ in sheet1['ImageSOPIUID']].index(True)
         # Get ROI coords
         roi = {'x1': '', 'x2': '', 'y1': '' ,'y2': '', 'image_width': ''}
-        roi['x1'] = getSpreadsheetCell('X1', imageSOPIUID, sheet1)
-        roi['x2'] = getSpreadsheetCell('X2', imageSOPIUID, sheet1)
-        roi['y1'] = getSpreadsheetCell('Y1', imageSOPIUID, sheet1)
-        roi['y2'] = getSpreadsheetCell('Y2', imageSOPIUID, sheet1)
+        roi['x'] = [getSpreadsheetCell('X1', imageSOPIUID, sheet1),
+                    getSpreadsheetCell('X2', imageSOPIUID, sheet1)]
+        roi['y'] = [getSpreadsheetCell('Y1', imageSOPIUID, sheet1),
+                    getSpreadsheetCell('Y2', imageSOPIUID, sheet1)]
         # Get image width
-        img = pydicom.dcmread(f)
+        img = pydicom.dcmread(f_cont)
         roi['image_width'] = img.Columns
 
         # Compute contrilateral coords
-        roi_cont = {'x1': '', 'x2': '', 'y1': '' ,'y2': ''}
-        roi_cont['x1'] = roi['image_width'] - roi['x2']
-        roi_cont['x2'] = roi['image_width'] - roi['x1']
-        roi_cont['y1'] = roi['y1']
-        roi_cont['y2'] = roi['y2']
+        roi_cont = {'x': '','y': ''}
+        roi_cont['x'] = [roi['image_width'] - roi['x'][0],
+                         roi['image_width'] - roi['x'][1]]
+        roi_cont['y'] = [roi['y'][0],
+                         roi['y'][1]]
 
-
+        # Take crops
+        tmp = img.pixel_array
+        x = roi_cont['x']
+        y = roi_cont['y']
+        c = [round((x[0]+x[1])/2), round((y[0]+y[1])/2)]
+        # Pad images before cropping (pad with 0's)
+        pad = crop_size/2
+        tmp = np.pad(tmp, pad, mode='constant', constant_values=(0))
+        crops.update({'ImageSOPIUID': tmp[int(c[1]-crop_size/2+pad):int(c[1]+crop_size/2+pad),
+                         int(c[0]-crop_size/2+pad):int(c[0]+crop_size/2+pad)]})
+        # Reshape from (256, 256) to (256, 256, 1)
+        crops['ImageSOPIUID'] = np.reshape(img[key]['crop'],
+                                      (img[key]['crop'].shape[0],
+                                       img[key]['crop'].shape[1],
+                                       1))
+    # Save as pickle
+    print('Writing pickle...')
+    print('len(image_pickle): ', len(crops))
+    savePickle(crops, write_location + 'cont_batches_' +
+               str(min(batch_numbers)) + '-' + str(max(batch_numbers))+ '.pickle')
 
 # Get list of files that are for presentation and have ROIs
 # Copy these files to a new folder
@@ -116,9 +162,7 @@ def get_ROIs(dst_copy_lesion, lesion_path, spreadsheet, batch = 1, copy = True):
 
 # This will copy images to a separate folder that have both ROIs, are for
 # presentation and ensures that only one image from each StudyIUID is copied
-def select_and_copy_dicom_images():
-    batch_numbers = [1, 3, 5, 6, 7]
-    batch_numbers = [1]
+def select_and_copy_dicom_images(batch_numbers):
     #batch_numbers = [1]
     for batch in batch_numbers:
         dicom_files = (
@@ -143,8 +187,6 @@ def select_and_copy_dicom_images():
 # Do I already have a function to do this? Probs
 def create_patches(crop_size, write_location, spreadsheet):
     batch_numbers = [1, 3, 5, 6, 7]
-    dicom_img = np.asarray([]) # DELETE
-    file_list = [] # DELETE
     image_dict = {}
     for batch in batch_numbers:
         # Load in the images and filenames
@@ -159,13 +201,9 @@ def create_patches(crop_size, write_location, spreadsheet):
         image_dict.update(buildDict(tmp_dicom, tmp_list, spreadsheet, verbose =
                                    True))
         print('len(image_dict): ', len(image_dict))
-    print('Done')
-    # Build a dict and convert the dicom files to RGB
-    #image_dict = buildDict(dicom_img, file_list, spreadsheet)
 
     # Compute patches from full RGB images
     image_dict = computeCrops(image_dict, crop_size)
-    #writeCropsToDisk(image_dict, write_location, crop_size)
     # Create dict ready for pickle
     # key = file name: RGB image
     image_pickle = {}
@@ -187,7 +225,8 @@ def main():
     patch_write_location = '/vol/research/mammo2/will/data/batches/roi/'
 
     #create_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
-    select_and_copy_dicom_images()
+    select_and_copy_dicom_images(batch_numbers = [1, 3, 5, 6, 7])
+    #contrilateral_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
 
 if __name__ == "__main__":
     main()
