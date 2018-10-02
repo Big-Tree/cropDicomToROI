@@ -67,7 +67,7 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
                 all_dicom_files, '*' + match['ImageSOPIUID'] + '*')
             match['path'].append(search[0])
 
-            print('Match', '(', f_index, '/',
+            print('Match', '(', f_index+1, '/',
                   len(file_list_lesion), ')', 'batch ', batch)
             cont_image_paths_to_copy.append(match['path'][0])
             lesion_names_with_cont.append(os.path.basename(f))
@@ -84,39 +84,24 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
                 '\n' + lesion_name[0:-4] + ' --- ' +
                 os.path.basename(cont_path)[0:-4])
     # Copy contilateral images to a folder - use multi processing
-    time_multi_start = time.time()
     func = partial(multiprocess_copy, dst_copy_cont, batch,
                    len(cont_image_paths_to_copy))
     results = pool.map(func, list(zip(cont_image_paths_to_copy,
                                  lesion_names_with_cont,
                                       range(len(cont_image_paths_to_copy)))))
-    multi_run_time = time.time() - time_multi_start
-    print('Multi: ', multi_run_time)
-
-    # Copy the contilateral images to a folder
-    time_single_start = time.time()
-    with open(dst_copy_cont + '/lesion_to_cont_details.txt', 'w') as text_file:
-        text_file.write('Format:\nLesion --- Contralateral')
-        for count, (cont_path, lesion_name) in enumerate(zip(
-                cont_image_paths_to_copy, lesion_names_with_cont)):
-            copyfile(cont_path, dst_copy_cont + '/' + lesion_name)
-            text_file.write('\n' + lesion_name[0:-4] + ' --- ' +
-                            os.path.basename(cont_path)[0:-4])
-            print(count + 1, '/', len(cont_image_paths_to_copy), 'batch ', batch )
-    single_run_time = time.time() - time_single_start
-    print('\nRunning time compare:')
-    print('Multi: ', multi_run_time)
-    print('Single: ', single_run_time)
 
 
 
-def contrilateral_patches(crop_size, write_location, spreadsheet):
+# Should run through the dicom contrilaterals, find the ROIs and crop
+# The conts are named with their matching lesion making it easier to look up
+# the roi
+def contrilateral_patches(crop_size, write_location, spreadsheet,
+                          batch_numbers):
     import pandas as pd
     print('Creating contilateral patches, size: ', crop_size, '...')
     xls = pd.ExcelFile(spreadsheet)
     sheet0 = xls.parse(0)
     sheet1 = xls.parse(1)
-    batch_numbers = [1, 3, 5, 6, 7]
     image_dict = {}
     for batch in batch_numbers:
         # Load in the images and filenames
@@ -254,16 +239,20 @@ def create_patches(crop_size, write_location, spreadsheet):
 
 
 def main():
+    import time
+
     # Globals
     CROP_SIZE = 256
     SPREADSHEET = '/vol/research/mammo2/will/data/batches/metadata/1/batch_1_IMAGE.xls'
     DICOM_FILES =(
     '/vol/research/mammo2/will/data/batches/roi/batch_1/lesions_for_presentation_one_per_studyIUID/')
     patch_write_location = '/vol/research/mammo2/will/data/batches/roi/'
-
+    
+    start_time = time.time()
     #create_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
-    select_and_copy_dicom_images(batch_numbers = [1])#, 3, 5, 6, 7])
+    select_and_copy_dicom_images(batch_numbers = [1, 3, 5, 6, 7])
     #contrilateral_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
+    print('Done: ', time.time() - start_time, ' seconds')
 
 if __name__ == "__main__":
     main()
