@@ -8,6 +8,7 @@ import png
 from fnmatch import fnmatch
 
 def getFileNames(dicom_files):
+    print('Getting dicom file names...')
     fileList = []
     for path, subdirs, files in os.walk(dicom_files):
         for name in files:
@@ -260,9 +261,9 @@ def computeCrops(img, crop_size = 256):
         x = img[key]['x']
         y = img[key]['y']
         c = [round((x[0]+x[1])/2), round((y[0]+y[1])/2)]
-        # Pad images before cropping (wrap around)
-        pad = 1000
-        tmp = np.pad(tmp, pad, mode='wrap')
+        # Pad images before cropping (pad with zeroes)
+        pad = round(cop_size/2)
+        tmp = np.pad(tmp, pad, mode='constant', constant_values=(0))
         img[key].update({'crop':
                          tmp[int(c[1]-crop_size/2+pad):int(c[1]+crop_size/2+pad),
                              int(c[0]-crop_size/2+pad):int(c[0]+crop_size/2+pad)]})
