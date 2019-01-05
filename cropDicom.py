@@ -200,8 +200,7 @@ def select_and_copy_dicom_images(batch_numbers):
 
 # Create patches from the images that we separated out
 # Do I already have a function to do this? Probs
-def create_patches(crop_size, write_location, spreadsheet):
-    batch_numbers = [1, 3, 5, 6, 7]
+def lesion_patches(crop_size, write_location, batch_numbers):
     image_dict = {}
     for batch in batch_numbers:
         # Load in the images and filenames
@@ -240,13 +239,17 @@ def main():
     DICOM_FILES =(
     '/vol/research/mammo2/will/data/batches/roi/batch_1/lesions_for_presentation_one_per_studyIUID/')
     patch_write_location = '/vol/research/mammo2/will/data/batches/roi/'
+    patch_write_location = \
+        '/vol/research/mammo/mammo2/will/data/batches/roi_new'
+    #batch_numbers = [1, 3, 5, 6, 7]
     batch_numbers = [1, 3, 5, 6, 7]
 
     start_time = time.time()
-    #create_patches(CROP_SIZE, patch_write_location, SPREADSHEET)
     #select_and_copy_dicom_images(batch_numbers)
-    contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
-    print('Done: ', time.time() - start_time, ' seconds')
+    lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
+    #contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
+    print('Done: ', round(time.time() - start_time), ' seconds')
 
 if __name__ == "__main__":
     main()
+
