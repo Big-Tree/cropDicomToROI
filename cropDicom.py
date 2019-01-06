@@ -75,6 +75,12 @@ def get_contrilateral(file_list_lesion, dst_copy_cont, all_dicom_files, spreadsh
             print('No contrilateral for:\n', focus_ImageSOPIUID)
 
 
+    # Check to see if destination directory exists
+    print('checking to see if following directory exists:\n{}'.format(
+        dst_copy_cont))
+    if os.path.isdir(dst_copy_cont) == False:
+        print('Did not exist... creating')
+        os.mkdir(dst_copy_cont)
     # Write text file detailing lesions and cont
     with open(dst_copy_cont + '/lesion_to_cont_details.txt', 'w') as text_file:
         text_file.write('Format:\nLesion --- Contralateral')
@@ -155,6 +161,7 @@ def contrilateral_patches(crop_size, write_location, batch_numbers):
 # Copy these files to a new folder
 def get_ROIs(dst_copy_lesion, lesion_path, spreadsheet, batch = 1, copy = True):
     import pandas as pd
+    import os
     from shutil import copyfile
     xls = pd.ExcelFile(spreadsheet)
     sheet1 = xls.parse(1)
@@ -169,6 +176,12 @@ def get_ROIs(dst_copy_lesion, lesion_path, spreadsheet, batch = 1, copy = True):
     file_list = filter_for_single_StudyIUID(file_list, sheet1)
 
     if copy == True:
+        # Check to see if destination directory exists
+        print('checking to see if following directory exists:\n{}'.format(
+            dst_copy_lesion))
+        if os.path.isdir(dst_copy_lesion) == False:
+            print('Did not exist... creating')
+            os.mkdir(dst_copy_lesion)
         for index, path in enumerate(file_list):
             copyfile(path, dst_copy_lesion + '/' + os.path.basename(file_list[index]))
             print(index, '\\', len(file_list), 'batch ', batch )
@@ -188,7 +201,7 @@ def select_and_copy_dicom_images(batch_numbers):
 
         lesion_file_list = get_ROIs('/vol/research/mammo/mammo2/will/data/batches/roi/batch_' +
             str(batch) + '/lesions_for_presentation_one_per_studyIUID',
-            dicom_files, spreadsheet, copy = False)
+            dicom_files, spreadsheet, copy = True)
 
         dst_copy_cont = ('/vol/research/mammo/mammo2/will/data/batches/roi/batch_' +
                          str(batch) +
@@ -199,6 +212,7 @@ def select_and_copy_dicom_images(batch_numbers):
 
 
 # Create patches from the images that we separated out
+# Both lesions and normal contrilaterals
 # Do I already have a function to do this? Probs
 def lesion_patches(crop_size, write_location, batch_numbers):
     image_dict = {}
@@ -232,6 +246,7 @@ def lesion_patches(crop_size, write_location, batch_numbers):
 
 def main():
     import time
+    import os
 
     # Globals
     CROP_SIZE = 256
@@ -245,10 +260,21 @@ def main():
     all_batches = [[1], [3], [5], [6], [7], [8], [10], [11], [12], [13], [14],
                    [15], [16], [18], [19], [21], [22],
                    [23], [30]]
+    #all_batches = [[1]]
+
     for batch_numbers in all_batches:
+        # Check to see if destination directory exists
+        tmp_path = '/vol/research/mammo/mammo2/will/data/batches/roi/batch_' +\
+            str(batch_numbers[0])
+        print('checking to see if following directory exists:\n{}'.format(
+            tmp_path))
+        if os.path.isdir(tmp_path) == False:
+            print('Did not exist... creating')
+            os.mkdir(tmp_path)
+
         start_time = time.time()
-        #select_and_copy_dicom_images(batch_numbers)
-        lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
+        select_and_copy_dicom_images(batch_numbers)
+        #lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
         #contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
         print('BATCH {} COMPLETED'.format(batch_numbers[0]))
     print('Done: ', round(time.time() - start_time), ' seconds')
