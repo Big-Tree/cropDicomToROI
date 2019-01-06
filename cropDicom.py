@@ -102,9 +102,9 @@ def contrilateral_patches(crop_size, write_location, batch_numbers):
     for batch in batch_numbers:
         # Load in the images and filenames
         file_list_cont = getFileNames(
-            '/vol/research/mammo2/will/data/batches/roi/batch_' +
+            '/vol/research/mammo/mammo2/will/data/batches/roi/batch_' +
             str(batch) + '/cont_for_presentation_one_per_studyIUID/')
-        spreadsheet = ('/vol/research/mammo2/will/data/batches/metadata/' +
+        spreadsheet = ('/vol/research/mammo/mammo2/will/data/batches/metadata/' +
             str(batch) + '/batch_' + str(batch) + '_IMAGE.xls')
         xls = pd.ExcelFile(spreadsheet)
         sheet0 = xls.parse(0)
@@ -181,16 +181,16 @@ def select_and_copy_dicom_images(batch_numbers):
     #batch_numbers = [1]
     for batch in batch_numbers:
         dicom_files = (
-            '/vol/research/mammo2/will/data/batches/IMAGE_DATABASE/PUBLIC_SHARE/IMAGES/STANDARD_SET/'
+            '/vol/research/mammo/mammo2/will/data/batches/IMAGE_DATABASE/PUBLIC_SHARE/IMAGES/STANDARD_SET/'
             + str(batch) + '/')
-        spreadsheet = ('/vol/research/mammo2/will/data/batches/metadata/' +
+        spreadsheet = ('/vol/research/mammo/mammo2/will/data/batches/metadata/' +
             str(batch) + '/batch_' + str(batch) + '_IMAGE.xls')
 
-        lesion_file_list = get_ROIs('/vol/research/mammo2/will/data/batches/roi/batch_' +
+        lesion_file_list = get_ROIs('/vol/research/mammo/mammo2/will/data/batches/roi/batch_' +
             str(batch) + '/lesions_for_presentation_one_per_studyIUID',
             dicom_files, spreadsheet, copy = False)
 
-        dst_copy_cont = ('/vol/research/mammo2/will/data/batches/roi/batch_' +
+        dst_copy_cont = ('/vol/research/mammo/mammo2/will/data/batches/roi/batch_' +
                          str(batch) +
                          '/cont_for_presentation_one_per_studyIUID')
         all_dicom_files = getFileNames(dicom_files)
@@ -205,9 +205,9 @@ def lesion_patches(crop_size, write_location, batch_numbers):
     for batch in batch_numbers:
         # Load in the images and filenames
         dicom_files = (
-            '/vol/research/mammo2/will/data/batches/roi/batch_'
+            '/vol/research/mammo/mammo2/will/data/batches/roi/batch_'
             + str(batch) + '/lesions_for_presentation_one_per_studyIUID/')
-        spreadsheet = ('/vol/research/mammo2/will/data/batches/metadata/' +
+        spreadsheet = ('/vol/research/mammo/mammo2/will/data/batches/metadata/' +
             str(batch) + '/batch_' + str(batch) + '_IMAGE.xls')
         print('dicom_files:\n', dicom_files)
         print('spreadsheet:\n', spreadsheet)
@@ -225,8 +225,8 @@ def lesion_patches(crop_size, write_location, batch_numbers):
         image_pickle.update({key: image_dict[key]['crop']})
     print('Writing pickle...')
     print('len(image_pickle): ', len(image_pickle))
-    savePickle(image_pickle, write_location + 'batches_' +
-               str(min(batch_numbers)) + '-' + str(max(batch_numbers))+ '.pickle')
+    savePickle(image_pickle, write_location + 'lesion_batch_' +
+               str(batch_numbers[0]) + '.pickle')
 
 
 
@@ -235,19 +235,22 @@ def main():
 
     # Globals
     CROP_SIZE = 256
-    SPREADSHEET = '/vol/research/mammo2/will/data/batches/metadata/1/batch_1_IMAGE.xls'
+    SPREADSHEET = '/vol/research/mammo/mammo2/will/data/batches/metadata/1/batch_1_IMAGE.xls'
     DICOM_FILES =(
-    '/vol/research/mammo2/will/data/batches/roi/batch_1/lesions_for_presentation_one_per_studyIUID/')
-    patch_write_location = '/vol/research/mammo2/will/data/batches/roi/'
+    '/vol/research/mammo/mammo2/will/data/batches/roi/batch_1/lesions_for_presentation_one_per_studyIUID/')
+    patch_write_location = '/vol/research/mammo/mammo2/will/data/batches/roi/'
     patch_write_location = \
-        '/vol/research/mammo/mammo2/will/data/batches/roi_new'
+        '/vol/research/mammo/mammo2/will/data/batches/roi_new/'
     #batch_numbers = [1, 3, 5, 6, 7]
-    batch_numbers = [1, 3, 5, 6, 7]
-
-    start_time = time.time()
-    #select_and_copy_dicom_images(batch_numbers)
-    lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
-    #contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
+    all_batches = [[1], [3], [5], [6], [7], [8], [10], [11], [12], [13], [14],
+                   [15], [16], [18], [19], [21], [22],
+                   [23], [30]]
+    for batch_numbers in all_batches:
+        start_time = time.time()
+        #select_and_copy_dicom_images(batch_numbers)
+        lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
+        #contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
+        print('BATCH {} COMPLETED'.format(batch_numbers[0]))
     print('Done: ', round(time.time() - start_time), ' seconds')
 
 if __name__ == "__main__":

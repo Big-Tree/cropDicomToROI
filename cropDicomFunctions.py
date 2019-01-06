@@ -262,7 +262,7 @@ def computeCrops(img, crop_size = 256):
         y = img[key]['y']
         c = [round((x[0]+x[1])/2), round((y[0]+y[1])/2)]
         # Pad images before cropping (pad with zeroes)
-        pad = round(cop_size/2)
+        pad = round(crop_size/2)
         tmp = np.pad(tmp, pad, mode='constant', constant_values=(0))
         img[key].update({'crop':
                          tmp[int(c[1]-crop_size/2+pad):int(c[1]+crop_size/2+pad),
@@ -317,6 +317,7 @@ def buildArrayForPickle(img):    #img.update({key:{}})
 
 def savePickle(ob, dest):
     import pickle
+    print('Pickle destination:\n{}'.format(dest))
     print('Pickling...')
     with open(dest, 'wb') as output:
         pickle.dump(ob, output, pickle.HIGHEST_PROTOCOL)
@@ -347,3 +348,4 @@ def buildDictNormals(dicomImg, fileList):
         #LATER
 #         img[key].update({'x': [sheet['X1'][indx], sheet['X2'][indx]]})
 #         img[key].update({'y': [sheet['Y1'][indx], sheet['Y2'][indx]]})
+
