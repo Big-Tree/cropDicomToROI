@@ -154,8 +154,8 @@ def contrilateral_patches(crop_size, write_location, batch_numbers):
     # Save as pickle
     print('Writing pickle...')
     print('len(image_pickle): ', len(crops))
-    savePickle(crops, write_location + 'cont_batches_' +
-               str(min(batch_numbers)) + '-' + str(max(batch_numbers))+ '.pickle')
+    savePickle(crops, write_location + 'batch_' +
+               str(batch_numbers[0]) + '/contrilaterals.pickle')
 
 # Get list of files that are for presentation and have ROIs
 # Copy these files to a new folder
@@ -239,8 +239,8 @@ def lesion_patches(crop_size, write_location, batch_numbers):
         image_pickle.update({key: image_dict[key]['crop']})
     print('Writing pickle...')
     print('len(image_pickle): ', len(image_pickle))
-    savePickle(image_pickle, write_location + 'lesion_batch_' +
-               str(batch_numbers[0]) + '.pickle')
+    savePickle(image_pickle, write_location + 'batch_' +
+               str(batch_numbers[0]) + '/lesions.pickle')
 
 
 
@@ -254,8 +254,8 @@ def main():
     DICOM_FILES =(
     '/vol/research/mammo/mammo2/will/data/batches/roi/batch_1/lesions_for_presentation_one_per_studyIUID/')
     patch_write_location = '/vol/research/mammo/mammo2/will/data/batches/roi/'
-    patch_write_location = \
-        '/vol/research/mammo/mammo2/will/data/batches/roi_new/'
+    #patch_write_location = \
+    #   '/vol/research/mammo/mammo2/will/data/batches/roi_new/'
     #batch_numbers = [1, 3, 5, 6, 7]
     all_batches = [[1], [3], [5], [6], [7], [8], [10], [11], [12], [13], [14],
                    [15], [16], [18], [19], [21], [22],
@@ -273,8 +273,8 @@ def main():
             os.mkdir(tmp_path)
 
         start_time = time.time()
-        select_and_copy_dicom_images(batch_numbers)
-        #lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
+        #select_and_copy_dicom_images(batch_numbers)
+        lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
         #contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
         print('BATCH {} COMPLETED'.format(batch_numbers[0]))
     print('Done: ', round(time.time() - start_time), ' seconds')

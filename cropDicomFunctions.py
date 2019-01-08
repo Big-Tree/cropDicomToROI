@@ -33,13 +33,32 @@ def getFiles(dicom_files, verbose=1):
     # Load dicom files into np array
     dicomImg = np.array([])
     count = 0
+    error_count = 0
     print(len(fileList), ' Files found')
     print('Loading images...')
-    for f in fileList:
-        dicomImg = np.append(dicomImg, pydicom.dcmread(f))
-        count += 1
-        print(count, '/', len(fileList))
+    indexes_to_delete = []
+    for index, f in enumerate(fileList):
+        try:
+            count += 1
+            dicomImg = np.append(dicomImg, pydicom.dcmread(f, force=True)) # Force
+                # because following error:File is missing DICOM File Meta Information
+                # header or the 'DICM' prefix is missing from the header 
+            print(count, '/', len(fileList))
+        except Exception as e:
+            print('***ERROR - Following file possibly missing header\
+                  information:\n{}'.format(f))
+            print('Original error:\n{}'.format(e))
+            print('len(fileList): {}\nlen(dicomImg): {}'.format(
+                len(fileList), len(dicomImg)))
+            error_count += 1
+            # Important that we also remove the file name from fileList
+            indexes_to_delete.append(index)
+#            print('post del...\nlen(fileList): {}\nlen(dicomImg): {}'.format(
+#                len(fileList), len(dicomImg)))
+    # Delete fileNames that had errors
+    fileList = np.delete(fileList, indexes_to_delete)
     #print('name:\n', dicomImg[0].PresentationIntentType)
+    print('***NUMBER OF ERRORS FOR DICOM READ: {}'.format(error_count))
     return dicomImg, fileList
 
 
@@ -203,6 +222,8 @@ def buildDict(dicomImg, fileList, spreadsheet, verbose = True):
     for i in range(len(fileList)):
         key = os.path.basename(fileList[i])[:-4]
         # Find row in the xml file that holds the img info
+        #print('len(dicomImg): {}'.format(len(dicomImg)))   ***DELETE
+        #print('len(fileList): {}'.format(len(fileList)))   ***DELETE
         try:
             indx = [_ == key for _ in sheet['ImageSOPIUID']].index(True) # ImageSOPIUID, ReferencedSOPInstanceUID
             img.update({key:{}})
