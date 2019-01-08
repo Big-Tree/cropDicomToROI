@@ -1,4 +1,5 @@
 from cropDicomFunctions import *
+from tqdm import tqdm
 # _______Conterlateral____________
 # Get file names of selected lesion dicom images
 # Using the spreadsheet find the contrilateral images
@@ -115,42 +116,60 @@ def contrilateral_patches(crop_size, write_location, batch_numbers):
         xls = pd.ExcelFile(spreadsheet)
         sheet0 = xls.parse(0)
         sheet1 = xls.parse(1)
+        indexes_to_delete = []
+        error_count = 0
         # conts have the name of their lesions pair
-        for count, f_cont in enumerate(file_list_cont): 
-            print('Crop', '(', count+1, '/', len(file_list_cont), ')', 'batch ',
-                  batch)
-            imageSOPIUID = os.path.basename(f_cont)[:-4]
-            # Get ROI coords
-            roi = {'x1': '', 'x2': '', 'y1': '' ,'y2': '', 'image_width': ''}
-            roi['x'] = [getSpreadsheetCell('X1', imageSOPIUID, sheet1),
-                        getSpreadsheetCell('X2', imageSOPIUID, sheet1)]
-            roi['y'] = [getSpreadsheetCell('Y1', imageSOPIUID, sheet1),
-                        getSpreadsheetCell('Y2', imageSOPIUID, sheet1)]
-            # Get image width
-            img = pydicom.dcmread(f_cont)
-            roi['image_width'] = img.Columns
+        print('Getting contrilaterals and cropping')
+        for count, f_cont in enumerate(tqdm(file_list_cont, ascii=True)):
+            try:
+                #print('Crop', '(', count+1, '/', len(file_list_cont), ')',
+                #      'batch ', batch)
+                imageSOPIUID = os.path.basename(f_cont)[:-4]
+                # Get ROI coords
+                roi = {'x1': '', 'x2': '', 'y1': '' ,'y2': '',
+                       'image_width': ''}
+                roi['x'] = [getSpreadsheetCell('X1', imageSOPIUID, sheet1),
+                            getSpreadsheetCell('X2', imageSOPIUID, sheet1)]
+                roi['y'] = [getSpreadsheetCell('Y1', imageSOPIUID, sheet1),
+                            getSpreadsheetCell('Y2', imageSOPIUID, sheet1)]
+                # Get image width
+                img = pydicom.dcmread(f_cont)
+                roi['image_width'] = img.Columns
 
-            # Compute contrilateral coords
-            roi_cont = {'x': '','y': ''}
-            roi_cont['x'] = [roi['image_width'] - roi['x'][0],
-                             roi['image_width'] - roi['x'][1]]
-            roi_cont['y'] = [roi['y'][0],
-                             roi['y'][1]]
+                # Compute contrilateral coords
+                roi_cont = {'x': '','y': ''}
+                roi_cont['x'] = [roi['image_width'] - roi['x'][0],
+                                 roi['image_width'] - roi['x'][1]]
+                roi_cont['y'] = [roi['y'][0],
+                                 roi['y'][1]]
 
-            # Take crops
-            tmp = img.pixel_array
-            x = roi_cont['x']
-            y = roi_cont['y']
-            c = [round((x[0]+x[1])/2), round((y[0]+y[1])/2)]
-            # Pad images before cropping (pad with 0's)
-            pad = round(crop_size/2)
-            tmp = np.pad(tmp, pad, mode='constant', constant_values=(0))
-            # crop
-            tmp = (tmp[int(c[1]-crop_size/2+pad):int(c[1]+crop_size/2+pad),
-                             int(c[0]-crop_size/2+pad):int(c[0]+crop_size/2+pad)])
-            # Reshape from (256, 256) to (256, 256, 1)
-            tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
-            crops.append(tmp)
+                # Take crops
+                tmp = img.pixel_array
+                x = roi_cont['x']
+                y = roi_cont['y']
+                c = [round((x[0]+x[1])/2), round((y[0]+y[1])/2)]
+                # Pad images before cropping (pad with 0's)
+                pad = round(crop_size/2)
+                tmp = np.pad(tmp, pad, mode='constant', constant_values=(0))
+                # crop
+                tmp = (tmp[int(c[1]-crop_size/2+pad):int(c[1]+crop_size/2+pad),
+                    int(c[0]-crop_size/2+pad):int(c[0]+crop_size/2+pad)])
+                # Reshape from (256, 256) to (256, 256, 1)
+                tmp.shape = (tmp.shape[0], tmp.shape[1], 1)
+                crops.append(tmp)
+            except Exception as e:
+                print('***ERROR - Following file possibly missing header\
+                      information:\n{}'.format(f_cont))
+                print('Original error:\n{}'.format(e))
+                print('len(file_list_cont): {}\nlen(crops): {}'.format(
+                    len(file_list_cont), len(crops)))
+                error_count += 1
+                # Important that we also remove the file name from fileList
+                indexes_to_delete.append(count)
+    # Delete fileNames that had errors
+    file_list_cont = np.delete(file_list_cont, indexes_to_delete)
+    print('***NUMBER OF ERRORS FOR DICOM READ: {}'.format(error_count))
+
     # Save as pickle
     print('Writing pickle...')
     print('len(image_pickle): ', len(crops))
@@ -274,8 +293,8 @@ def main():
 
         start_time = time.time()
         #select_and_copy_dicom_images(batch_numbers)
-        lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
-        #contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
+        #lesion_patches(CROP_SIZE, patch_write_location, batch_numbers)
+        contrilateral_patches(CROP_SIZE, patch_write_location, batch_numbers)
         print('BATCH {} COMPLETED'.format(batch_numbers[0]))
     print('Done: ', round(time.time() - start_time), ' seconds')
 

@@ -5,7 +5,9 @@ import pandas as pd
 import pydicom
 import matplotlib.pyplot as plt
 import png
+from tqdm import tqdm
 from fnmatch import fnmatch
+
 
 def getFileNames(dicom_files):
     print('Getting dicom file names...')
@@ -37,13 +39,14 @@ def getFiles(dicom_files, verbose=1):
     print(len(fileList), ' Files found')
     print('Loading images...')
     indexes_to_delete = []
-    for index, f in enumerate(fileList):
+
+    for index, f in enumerate(tqdm(fileList, ascii=True)):
         try:
             count += 1
             dicomImg = np.append(dicomImg, pydicom.dcmread(f, force=True)) # Force
                 # because following error:File is missing DICOM File Meta Information
                 # header or the 'DICM' prefix is missing from the header 
-            print(count, '/', len(fileList))
+            #print(count, '/', len(fileList)) # DELETE
         except Exception as e:
             print('***ERROR - Following file possibly missing header\
                   information:\n{}'.format(f))
